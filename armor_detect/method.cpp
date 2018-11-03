@@ -1,5 +1,7 @@
 #include "method.h"
 
+
+
 using namespace cv;
 using namespace std;
 
@@ -23,6 +25,7 @@ Mat Method::yuvBlue()
     u = split_img[1];
     v = split_img[2];
     return v;
+
 //    const Scalar low = 139 + 5;
 //    const Scalar high = 255;
 //    inRange(v, low, high, src_img);
@@ -256,6 +259,8 @@ Mat Method::detectRedArmor()
             }
         }
 
+        Mat ROI;
+
         // at least find one
         if (minDiameterMsg.size() > 0)
         {
@@ -267,8 +272,14 @@ Mat Method::detectRedArmor()
             }
 
             circle(darkerImg, Point2f(minDiameterMsg[min][1], minDiameterMsg[min][2]), minDiameterMsg[min][0] / 2.0, Scalar(255, 0, 255), 3);
+
+            ROI = darkerImg(Rect(minDiameterMsg[min][1] - minDiameterMsg[min][0] / 2.0 * 1.5,
+                                     minDiameterMsg[min][2] - minDiameterMsg[min][0] / 2.0 * 1.5,
+                                     int(minDiameterMsg[min][0] / 2 * 3), int(minDiameterMsg[min][0] / 2 * 3)));
+
         }
 
+            imshow("ROI", ROI);
 
 
         imshow("src", frame);
@@ -281,36 +292,55 @@ Mat Method::detectRedArmor()
 }
 
 
-void Method::detectBlueArmor()
+/////////////////////////////////////////////////////////////////
+//@projectName   armor_detect
+//@author        kevin
+//@brief         根据上一帧进行ROI截图操作，当上一帧存在ROI时，flag = 1,
+//               否则flag = 0，当flag不同时坐标计算也不同，要保存上一帧的
+//               状态在一个vector中
+//@date          2018_10_28
+/////////////////////////////////////////////////////////////////
+
+
+void Method::detectBlueArmor(VideoCapture& cap)
 {
 
-    VideoCapture cap;
+
     Mat frame;
-    frame = cap.open("/home/kevin/out_blue_90.avi");
+    cap >> frame;
 
-    if (!cap.isOpened())
-    {
-        cout << "file not find!" << endl;
-    }
+    bool flag = 0, roi = 0;
+    vector<Vec4f> lastFrame; /* 定义上一帧 */
 
-    // loop to process every frame
+    /* loop to process every frame */
     while (cap.read(frame))
     {
+        Mat clone = frame.clone();
+
+        if (roi)
+        {
+            if (flag) //exists ROI
+            {
+                frame = frame(Rect(lastFrame[0][0], lastFrame[0][1], int(lastFrame[0][2]), int(lastFrame[0][3])));
+            }
+        }
+
 
         Mat preProcessImg;
-
         Mat binary_frame = Mat(frame.rows, frame.cols, CV_8UC1);
         cvtColor(frame, preProcessImg, COLOR_BGR2HSV);
-        // split hsv image and merge to decrease the lightness
 
+        /* split hsv image and merge to decrease the lightness */
         vector<Mat> plane;
         split(preProcessImg, plane);
         plane[2] = plane[2] - 30 - 30 - 10 - 10;
         merge(plane, preProcessImg);
 
+        /* get hsv img */
         Mat darkerImg = preProcessImg.clone();
         cvtColor(darkerImg, darkerImg, COLOR_HSV2BGR);
 
+        /* get binary img */
         for (int i = 0; i < frame.rows; i++)
         {
             Vec3b* p = preProcessImg.ptr<Vec3b>(i);
@@ -333,11 +363,14 @@ void Method::detectBlueArmor()
         dilate(binary_frame, binary_frame, element);
 
 
+        /* define vectors to contain msg */
         vector< vector<Point> > contours;
         vector<Vec4f> lanterns_msg;
         vector<Vec3f> minDiameterMsg;
 
-        // find contours in binary image
+
+
+        /* find contours in binary image */
         findContours(binary_frame, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
         for (int i = 0; i < contours.size(); i++)
         {
@@ -358,9 +391,9 @@ void Method::detectBlueArmor()
             float angle = rRect.angle;
             float center_x = rRect.center.x;
             float center_y = rRect.center.y;
-            // discard the ones whose area are too small
-            if (area > 66)
 
+            /* discard the ones whose area are too small */
+            if (area > 66)
             {
                 if ((height - width < -6) && (angle < -66) ||
                         (height - width > 6) && (angle > -30) )
@@ -390,6 +423,8 @@ void Method::detectBlueArmor()
 
         }
 
+
+        /*   find the actrual lanterns */
         for (int i = 0; i < lanterns_msg.size(); i++)
         {
             for (int j = i + 1; j < lanterns_msg.size(); j++)
@@ -431,6 +466,9 @@ void Method::detectBlueArmor()
             }
         }
 
+        Mat ROI ;
+
+        /* sort, find the minimal daimeter and circle it */
         if (minDiameterMsg.size() > 0)
         {
             int min = 0;
@@ -440,16 +478,67 @@ void Method::detectBlueArmor()
                     min = i;
             }
 
-            circle(darkerImg, Point2f(minDiameterMsg[min][1], minDiameterMsg[min][2]), minDiameterMsg[min][0] / 2.0, Scalar(0, 255, 255), 1);
+            double roi_left_top_x = minDiameterMsg[min][1] - minDiameterMsg[min][0] / 2.0 * 1.5;
+            if (roi_left_top_x <= 0)
+                roi_left_top_x = 0;
+            double roi_left_top_y = minDiameterMsg[min][2] - minDiameterMsg[min][0] / 2.0 * 1.5;
+            if (roi_left_top_y <= 0)
+                roi_left_top_y = 0;
+            int radius_x = int(minDiameterMsg[min][0] / 2 * 3);
+            if (radius_x >= int(darkerImg.cols - roi_left_top_x))
+                radius_x = int(darkerImg.cols - roi_left_top_x);
+            int radius_y = int(minDiameterMsg[min][0] / 2 * 3);
+            if (radius_y >= int(darkerImg.rows - roi_left_top_y))
+                radius_y = int(darkerImg.rows - roi_left_top_y);
+
+            ROI = darkerImg(Rect(roi_left_top_x,roi_left_top_y, radius_x, radius_y));
+
+
+            if (flag)
+            {
+                circle(clone, Point2f(minDiameterMsg[min][1] + lastFrame[0][0], minDiameterMsg[min][2] + lastFrame[0][1]),
+                        minDiameterMsg[min][0] / 2.0, Scalar(147, 20, 255), 2);
+                cout << Point2f(minDiameterMsg[min][1] + lastFrame[0][0], minDiameterMsg[min][2] + lastFrame[0][1]) << endl;
+                Vec4f roiMsg(roi_left_top_x + lastFrame[0][0],roi_left_top_y + lastFrame[0][1],
+                            radius_x, radius_y);
+                lastFrame.clear();
+                lastFrame.push_back(roiMsg);
+            }
+            if (!flag)
+            {
+                circle(clone, Point2f(minDiameterMsg[min][1], minDiameterMsg[min][2]),
+                        minDiameterMsg[min][0] / 2.0, Scalar(147, 20, 255), 2);
+                cout << Point2f(minDiameterMsg[min][1], minDiameterMsg[min][2]) << endl;
+                Vec4f roiMsg(roi_left_top_x,roi_left_top_y,radius_x, radius_y);
+                lastFrame.clear();
+                lastFrame.push_back(roiMsg);
+            }
         }
 
 
 
+        if (!ROI.empty())
+        {
+            imshow("ROI", ROI);
+            roi = true;
+            flag = true;
+           // ROI_search_region.push_back(ROI);
+
+        }
+        else
+        {
+            roi = false;
+            flag = false;
+        }
+
+
+
+        imshow("clone", clone);
         imshow("src", frame);
         imshow("binary", binary_frame);
-        imshow("frame", darkerImg);
+        imshow("light_adjusted", darkerImg);
 
-        waitKey(10);
+        waitKey(0);
     }
 }
 

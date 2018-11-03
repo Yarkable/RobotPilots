@@ -20,7 +20,7 @@ public:
     Mat hsvRed();
     Mat hsvBlue();
     Mat detectRedArmor();
-    void detectBlueArmor();
+    void detectBlueArmor(VideoCapture &cap);
     void gamma();
     void histoEqual();
     void set_img( Mat img);

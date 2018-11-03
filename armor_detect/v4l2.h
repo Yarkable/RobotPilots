@@ -10,8 +10,16 @@
 class V4l2
 {
 public:
-    void v4l2_set(const char* _file, int exposure, int saturation);
+    V4l2(const char* file, int exposure_value, int saturation_value);
+    void set_v4l2();
+    void get_v4l2();
+
+private:
+    const char* _file;
+    int exposure;
+    int saturation;
 };
+
 
 
 #endif // V4L2_H

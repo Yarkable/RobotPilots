@@ -1,61 +1,47 @@
-#include <QCoreApplication>
 #include "method.h"
 #include "v4l2.h"
 //#include "serialport.h"
 #include "handlecoordinate.h"
 
+
+
 using namespace std;
 using namespace cv;
 
-int main(int argc, char *argv[])
+int main()
 {
-    QCoreApplication a(argc, argv);
-        V4l2 set_cam;
-        set_cam.v4l2_set("/dev/video1", 10, 100);
 
+    int mode = 0;
+    V4l2 camera("/dev/video1", 100, 100);
+    camera.set_v4l2();
+    camera.get_v4l2();
 
+    Method armorDetect;
+    if (mode == 0)  // read loacl video
+    {
+        VideoCapture cap("/home/kevin/out_blue_90.avi");
+        if (!cap.isOpened())
+        {
+            cout << "camera not find!" << endl;
+        }
+        armorDetect.detectBlueArmor(cap);
+    }
 
-
-    Method armor;
-
-    armor.detectBlueArmor();
-    // armor.detectRedArmor();
-
-
-
-
-
-//    V4l2 set_cam;
-//    set_cam.v4l2_set("/dev/video1", 60, 100);
-////    VideoCapture cam(0);
-
-////    if (!cam.isOpened())
-////    {
-////        cout << "camera not find!" << endl;
-////    }
-
-//        Method armor;
-//        Mat img = imread("/home/kevin/armor1.jpg");
-//        Mat src_img, dst_img;
-//        armor.set_img(img);
-
-//        src_img = armor.getImg(0);
-
-//        armor.gamma();
-
-
-//        dst_img = armor.detectBlueArmor();
-
-//        HandleCoordinate handle;
-//        handle.findCoor(dst_img, src_img);
-//        armor.showSrcImg();
-//        imshow("dst_img", dst_img);
-//        waitKey(0);
+    if (mode == 1)  // capture camera
+    {
+        VideoCapture cap(1);
+        if (!cap.isOpened())
+        {
+            cout << "camera not find!" << endl;
+        }
+        armorDetect.detectBlueArmor(cap);
+    }
 
 
 
 
 
 
-    return a.exec();
+
+    return 0;
 }
